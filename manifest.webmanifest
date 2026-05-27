@@ -4,8 +4,8 @@
   "description": "可安裝的沖繩自駕旅遊小工具，包含行程、行前清單、記帳、天氣與匯率。",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f6fbfa",
-  "theme_color": "#0f766e",
+  "background_color": "#ecfaff",
+  "theme_color": "#0077b6",
   "lang": "zh-Hant",
   "icons": [
     {

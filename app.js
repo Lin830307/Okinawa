@@ -1,6 +1,13 @@
 const STORAGE_KEY = "okinawa-pwa-state-v1";
-const DEFAULT_CITY = "Naha, Okinawa";
+const DEFAULT_CITY = "Onna, Okinawa";
 const FALLBACK_JPY_TO_TWD = 0.214;
+const TRIP_DATES = [
+  "2026-06-13",
+  "2026-06-14",
+  "2026-06-15",
+  "2026-06-16",
+  "2026-06-17"
+];
 
 const itineraryData = [
   {
@@ -181,20 +188,23 @@ const elements = {
   panels: [...document.querySelectorAll(".tab-panel")],
   dayTabs: document.getElementById("day-tabs"),
   dayView: document.getElementById("day-view"),
-  tripProgressSummary: document.getElementById("trip-progress-summary"),
   checklistForm: document.getElementById("checklist-form"),
   checklistInput: document.getElementById("checklist-input"),
   checklistItems: document.getElementById("checklist-items"),
-  checklistProgress: document.getElementById("checklist-progress"),
   expenseForm: document.getElementById("expense-form"),
   expenseItems: document.getElementById("expense-items"),
   expenseCount: document.getElementById("expense-count"),
   expenseTotalJpy: document.getElementById("expense-total-jpy"),
   expenseTotalTwd: document.getElementById("expense-total-twd"),
   expenseAverage: document.getElementById("expense-average"),
+  expenseFilterDate: document.getElementById("expense-filter-date"),
+  expenseFilterPayer: document.getElementById("expense-filter-payer"),
+  expenseFilterCategory: document.getElementById("expense-filter-category"),
+  expenseFilterSummary: document.getElementById("expense-filter-summary"),
   weatherForm: document.getElementById("weather-form"),
   weatherLocation: document.getElementById("weather-location"),
   weatherUpdatedAt: document.getElementById("weather-updated-at"),
+  weatherRangeNote: document.getElementById("weather-range-note"),
   weatherCurrentTemp: document.getElementById("weather-current-temp"),
   weatherCurrentText: document.getElementById("weather-current-text"),
   weatherCurrentRain: document.getElementById("weather-current-rain"),
@@ -203,9 +213,6 @@ const elements = {
   exchangeUpdatedAt: document.getElementById("exchange-updated-at"),
   exchangeRateTwdJpy: document.getElementById("exchange-rate-twd-jpy"),
   exchangeRateJpyTwd: document.getElementById("exchange-rate-jpy-twd"),
-  exchangeForm: document.getElementById("exchange-form"),
-  manualRate: document.getElementById("manual-rate"),
-  clearManualRate: document.getElementById("clear-manual-rate"),
   converterForm: document.getElementById("converter-form"),
   converterAmount: document.getElementById("convert-amount"),
   converterDirection: document.getElementById("convert-direction"),
@@ -227,14 +234,17 @@ function loadState() {
 
   try {
     const parsed = JSON.parse(raw);
+    const mergedChecklist = mergeChecklistWithDefaults(
+      Array.isArray(parsed.checklist) ? parsed.checklist : []
+    );
     return {
       activeTab: parsed.activeTab || "itinerary",
       activeDay: parsed.activeDay || 1,
-      completed: parsed.completed || {},
-      checklist: Array.isArray(parsed.checklist) && parsed.checklist.length ? parsed.checklist : defaultChecklist,
+      checklist: mergedChecklist.length ? mergedChecklist : defaultChecklist,
       expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+      expenseFilters: parsed.expenseFilters || { date: "ALL", payer: "ALL", category: "ALL" },
       weather: parsed.weather || { location: DEFAULT_CITY, forecast: null, updatedAt: null },
-      exchange: parsed.exchange || { liveRate: null, manualRate: null, updatedAt: null }
+      exchange: parsed.exchange || { liveRate: null, updatedAt: null }
     };
   } catch (error) {
     console.error("state parse failed", error);
@@ -246,12 +256,26 @@ function createInitialState() {
   return {
     activeTab: "itinerary",
     activeDay: 1,
-    completed: {},
-    checklist: defaultChecklist,
+    checklist: mergeChecklistWithDefaults([]),
     expenses: [],
+    expenseFilters: { date: "ALL", payer: "ALL", category: "ALL" },
     weather: { location: DEFAULT_CITY, forecast: null, updatedAt: null },
-    exchange: { liveRate: null, manualRate: null, updatedAt: null }
+    exchange: { liveRate: null, updatedAt: null }
   };
+}
+
+function mergeChecklistWithDefaults(currentChecklist) {
+  const existingTexts = new Set(
+    currentChecklist
+      .map((item) => item?.text?.trim())
+      .filter(Boolean)
+  );
+
+  const missingDefaults = defaultChecklist
+    .filter((item) => !existingTexts.has(item.text))
+    .map((item) => ({ ...item, id: crypto.randomUUID() }));
+
+  return [...currentChecklist, ...missingDefaults];
 }
 
 function saveState() {
@@ -295,6 +319,7 @@ function bindEvents() {
       category: document.getElementById("expense-category").value,
       amount,
       currency,
+      payer: document.getElementById("expense-payer").value,
       jpyAmount,
       note: document.getElementById("expense-note").value.trim()
     });
@@ -302,6 +327,7 @@ function bindEvents() {
     elements.expenseForm.reset();
     document.getElementById("expense-date").value = "2026-06-13";
     document.getElementById("expense-currency").value = "JPY";
+    document.getElementById("expense-payer").value = "YY";
     saveState();
     renderExpenses();
   });
@@ -313,26 +339,6 @@ function bindEvents() {
     await refreshWeather();
   });
 
-  elements.exchangeForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const manualRate = Number(elements.manualRate.value);
-    if (!manualRate) {
-      return;
-    }
-    state.exchange.manualRate = manualRate;
-    saveState();
-    renderExchange();
-    renderExpenses();
-  });
-
-  elements.clearManualRate.addEventListener("click", () => {
-    state.exchange.manualRate = null;
-    elements.manualRate.value = "";
-    saveState();
-    renderExchange();
-    renderExpenses();
-  });
-
   elements.converterForm.addEventListener("submit", (event) => {
     event.preventDefault();
     renderConverter();
@@ -340,6 +346,24 @@ function bindEvents() {
 
   elements.refreshDataButton.addEventListener("click", async () => {
     await refreshRemoteData({ silent: false });
+  });
+
+  elements.expenseFilterDate.addEventListener("change", () => {
+    state.expenseFilters.date = elements.expenseFilterDate.value;
+    saveState();
+    renderExpenses();
+  });
+
+  elements.expenseFilterPayer.addEventListener("change", () => {
+    state.expenseFilters.payer = elements.expenseFilterPayer.value;
+    saveState();
+    renderExpenses();
+  });
+
+  elements.expenseFilterCategory.addEventListener("change", () => {
+    state.expenseFilters.category = elements.expenseFilterCategory.value;
+    saveState();
+    renderExpenses();
   });
 
   elements.installButton.addEventListener("click", async () => {
@@ -385,7 +409,7 @@ function renderItinerary() {
   itineraryData.forEach((day) => {
     const button = document.createElement("button");
     button.className = `day-tab${day.id === state.activeDay ? " is-active" : ""}`;
-    button.textContent = `${day.label} ${day.date}`;
+    button.textContent = day.label;
     button.addEventListener("click", () => {
       state.activeDay = day.id;
       saveState();
@@ -395,22 +419,6 @@ function renderItinerary() {
   });
 
   const activeDay = itineraryData.find((day) => day.id === state.activeDay) || itineraryData[0];
-  const dayCompleted = activeDay.items.filter((item) => state.completed[item.id]).length;
-  const dayPercent = Math.round((dayCompleted / activeDay.items.length) * 100);
-  const tripCounts = itineraryData.reduce(
-    (accumulator, day) => {
-      day.items.forEach((item) => {
-        accumulator.total += 1;
-        if (state.completed[item.id]) {
-          accumulator.done += 1;
-        }
-      });
-      return accumulator;
-    },
-    { done: 0, total: 0 }
-  );
-
-  elements.tripProgressSummary.textContent = `總完成度 ${Math.round((tripCounts.done / tripCounts.total) * 100)}%`;
   elements.dayView.innerHTML = "";
 
   const dayHeader = document.createElement("div");
@@ -420,44 +428,33 @@ function renderItinerary() {
       <p class="section-kicker">${activeDay.label} · ${activeDay.date}</p>
       <h3>${activeDay.title}</h3>
     </div>
-    <p class="pill">${dayCompleted} / ${activeDay.items.length} 已完成 · ${dayPercent}%</p>
   `;
   elements.dayView.appendChild(dayHeader);
 
+  const timeline = document.createElement("div");
+  timeline.className = "itinerary-timeline";
+  elements.dayView.appendChild(timeline);
+
   const template = document.getElementById("itinerary-card-template");
-  activeDay.items.forEach((item) => {
+  activeDay.items.forEach((item, index) => {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector(".itinerary-card");
-    const checkbox = fragment.querySelector("input");
     const time = fragment.querySelector(".itinerary-card__time");
     const title = fragment.querySelector("h3");
     const note = fragment.querySelector(".itinerary-card__note");
     const mapLink = fragment.querySelector(".map-link");
 
-    checkbox.checked = Boolean(state.completed[item.id]);
-    checkbox.addEventListener("change", () => {
-      state.completed[item.id] = checkbox.checked;
-      saveState();
-      renderItinerary();
-    });
-
+    card.classList.toggle("is-last", index === activeDay.items.length - 1);
     time.textContent = item.time;
     title.textContent = item.title;
     note.textContent = item.note;
     mapLink.href = item.map;
 
-    card.classList.toggle("is-done", checkbox.checked);
-    if (checkbox.checked) {
-      card.style.opacity = "0.72";
-    }
-
-    elements.dayView.appendChild(fragment);
+    timeline.appendChild(fragment);
   });
 }
 
 function renderChecklist() {
-  const doneCount = state.checklist.filter((item) => item.done).length;
-  elements.checklistProgress.textContent = `${doneCount} / ${state.checklist.length} 已完成`;
   elements.checklistItems.innerHTML = "";
 
   if (!state.checklist.length) {
@@ -467,27 +464,32 @@ function renderChecklist() {
 
   state.checklist.forEach((item) => {
     const row = document.createElement("article");
-    row.className = `stack-item${item.done ? " is-done" : ""}`;
+    row.className = "stack-item";
     row.innerHTML = `
-      <input class="toggle" type="checkbox" ${item.done ? "checked" : ""} aria-label="完成 ${item.text}">
       <div>
         <p class="stack-item__title"></p>
-        <p class="stack-item__meta">可編輯、可刪除，資料保存在本機</p>
       </div>
       <div class="stack-item__actions">
-        <button class="ghost-button" type="button">編輯</button>
-        <button class="ghost-button" type="button">刪除</button>
+        <button class="icon-button" type="button" aria-label="編輯項目" title="編輯">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M4 20l4.2-1 9.4-9.4-3.2-3.2L5 15.8 4 20z"></path>
+            <path d="M13.8 5.6l3.2 3.2"></path>
+          </svg>
+        </button>
+        <button class="icon-button icon-button--danger" type="button" aria-label="刪除項目" title="刪除">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M6 7h12"></path>
+            <path d="M9 7V5h6v2"></path>
+            <path d="M8 7l.8 11h6.4L16 7"></path>
+            <path d="M10 11v4"></path>
+            <path d="M14 11v4"></path>
+          </svg>
+        </button>
       </div>
     `;
 
     row.querySelector(".stack-item__title").textContent = item.text;
-    const [toggle, editButton, deleteButton] = [row.querySelector(".toggle"), ...row.querySelectorAll(".ghost-button")];
-
-    toggle.addEventListener("change", () => {
-      item.done = toggle.checked;
-      saveState();
-      renderChecklist();
-    });
+    const [editButton, deleteButton] = row.querySelectorAll(".icon-button");
 
     editButton.addEventListener("click", () => {
       const nextText = window.prompt("修改項目內容", item.text);
@@ -514,37 +516,58 @@ function renderChecklist() {
 }
 
 function renderExpenses() {
+  renderExpenseDateFilterOptions();
+  elements.expenseFilterDate.value = state.expenseFilters?.date || "ALL";
+  elements.expenseFilterPayer.value = state.expenseFilters?.payer || "ALL";
+  elements.expenseFilterCategory.value = state.expenseFilters?.category || "ALL";
+  const filteredExpenses = getFilteredExpenses();
   const effectiveRate = getEffectiveRate();
-  const totalJpy = state.expenses.reduce((sum, item) => sum + item.jpyAmount, 0);
+  const totalJpy = filteredExpenses.reduce((sum, item) => sum + item.jpyAmount, 0);
   const totalTwd = totalJpy * effectiveRate;
-  const average = state.expenses.length ? totalJpy / state.expenses.length : 0;
+  const average = filteredExpenses.length ? totalJpy / filteredExpenses.length : 0;
 
-  elements.expenseCount.textContent = `${state.expenses.length} 筆支出`;
+  elements.expenseCount.textContent = `${filteredExpenses.length} 筆支出`;
   elements.expenseTotalJpy.textContent = formatCurrency(totalJpy, "JPY");
   elements.expenseTotalTwd.textContent = formatCurrency(totalTwd, "TWD");
   elements.expenseAverage.textContent = formatCurrency(average, "JPY");
+  elements.expenseFilterSummary.textContent = buildExpenseFilterSummary(filteredExpenses.length);
   elements.expenseItems.innerHTML = "";
 
-  if (!state.expenses.length) {
-    elements.expenseItems.innerHTML = `<div class="empty-state">還沒有支出紀錄，第一筆可以從租車或第一餐開始。</div>`;
+  if (!filteredExpenses.length) {
+    elements.expenseItems.innerHTML = `<div class="empty-state">目前篩選下沒有支出紀錄，可以切換篩選條件看看。</div>`;
     return;
   }
 
-  state.expenses.forEach((item) => {
+  filteredExpenses.forEach((item) => {
     const row = document.createElement("article");
-    row.className = "stack-item";
+    row.className = "expense-entry";
     row.innerHTML = `
-      <div class="pill">${item.category}</div>
-      <div>
-        <p class="stack-item__title">${formatCurrency(item.amount, item.currency)} · ${item.note || "未填備註"}</p>
-        <p class="stack-item__meta">${item.date} · 約 ${formatCurrency(item.jpyAmount, "JPY")} / ${formatCurrency(item.jpyAmount * effectiveRate, "TWD")}</p>
+      <div class="expense-entry__main">
+        <div class="expense-entry__top">
+          <div class="expense-entry__label-row">
+            <span class="expense-entry__category">${item.category}</span>
+            <span class="expense-entry__chip expense-entry__chip--date">${item.date}</span>
+            <span class="expense-entry__chip expense-entry__chip--payer expense-entry__chip--payer-${(item.payer || "YY").toLowerCase()}">${item.payer || "YY"}</span>
+            <span class="expense-entry__inline-note">${item.note || "未填備註"}</span>
+          </div>
+          <strong class="expense-entry__amount">${formatCurrency(item.amount, item.currency)}</strong>
+        </div>
+        <p class="expense-entry__meta">約 ${formatCurrency(item.jpyAmount, "JPY")} / ${formatCurrency(item.jpyAmount * effectiveRate, "TWD")}</p>
       </div>
-      <div class="stack-item__actions">
-        <button class="ghost-button" type="button">刪除</button>
+      <div class="expense-entry__actions">
+        <button class="icon-button icon-button--danger" type="button" aria-label="刪除支出" title="刪除支出">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M6 7h12"></path>
+            <path d="M9 7V5h6v2"></path>
+            <path d="M8 7l.8 11h6.4L16 7"></path>
+            <path d="M10 11v4"></path>
+            <path d="M14 11v4"></path>
+          </svg>
+        </button>
       </div>
     `;
 
-    row.querySelector(".ghost-button").addEventListener("click", () => {
+    row.querySelector(".icon-button").addEventListener("click", () => {
       state.expenses = state.expenses.filter((entry) => entry.id !== item.id);
       saveState();
       renderExpenses();
@@ -554,10 +577,51 @@ function renderExpenses() {
   });
 }
 
+function getFilteredExpenses() {
+  const dateFilter = state.expenseFilters?.date || "ALL";
+  const payerFilter = state.expenseFilters?.payer || "ALL";
+  const categoryFilter = state.expenseFilters?.category || "ALL";
+
+  return state.expenses.filter((item) => {
+    const dateMatch = dateFilter === "ALL" || item.date === dateFilter;
+    const payerMatch = payerFilter === "ALL" || item.payer === payerFilter;
+    const categoryMatch = categoryFilter === "ALL" || item.category === categoryFilter;
+    return dateMatch && payerMatch && categoryMatch;
+  });
+}
+
+function buildExpenseFilterSummary(count) {
+  const dateFilter = state.expenseFilters?.date || "ALL";
+  const payerFilter = state.expenseFilters?.payer || "ALL";
+  const categoryFilter = state.expenseFilters?.category || "ALL";
+  const dateText = dateFilter === "ALL" ? "全部日期" : dateFilter;
+  const payerText = payerFilter === "ALL" ? "全部付款人" : payerFilter;
+  const categoryText = categoryFilter === "ALL" ? "全部類別" : categoryFilter;
+  return `目前顯示 ${dateText}・${payerText}・${categoryText} 的 ${count} 筆支出統計。`;
+}
+
+function renderExpenseDateFilterOptions() {
+  const uniqueDates = [...new Set(state.expenses.map((item) => item.date).filter(Boolean))].sort();
+  const currentValue = state.expenseFilters?.date || "ALL";
+  elements.expenseFilterDate.innerHTML = `<option value="ALL">全部</option>`;
+
+  uniqueDates.forEach((date) => {
+    const option = document.createElement("option");
+    option.value = date;
+    option.textContent = date;
+    elements.expenseFilterDate.appendChild(option);
+  });
+
+  if (!uniqueDates.includes(currentValue)) {
+    state.expenseFilters.date = "ALL";
+  }
+}
+
 function renderWeather() {
   elements.weatherLocation.value = state.weather.location;
   if (!state.weather.forecast) {
     elements.weatherUpdatedAt.textContent = "尚未更新";
+    elements.weatherRangeNote.textContent = "目前還沒有抓到天氣資料。等更新完成後，我會告訴你現在顯示的是近期預報，還是已經對到 2026/6/13 到 2026/6/17 的行程日期。";
     elements.weatherForecast.innerHTML = `<div class="empty-state">按一下更新天氣，就會帶入那霸近幾天的預報。</div>`;
     return;
   }
@@ -568,6 +632,7 @@ function renderWeather() {
   elements.weatherCurrentText.textContent = weatherCodeToText(current.weather_code);
   elements.weatherCurrentRain.textContent = `${Math.max(...daily.precipitation_probability_max)}%`;
   elements.weatherCurrentWind.textContent = `${Math.round(current.wind_speed_10m)} km/h`;
+  elements.weatherRangeNote.innerHTML = buildWeatherRangeMessage(daily.time);
   elements.weatherForecast.innerHTML = "";
 
   daily.time.forEach((date, index) => {
@@ -589,9 +654,7 @@ function renderExchange() {
   elements.exchangeUpdatedAt.textContent = state.exchange.updatedAt ? formatTimestamp(state.exchange.updatedAt) : "尚未更新";
   elements.exchangeRateJpyTwd.textContent = `${effectiveRate.toFixed(4)} TWD`;
   elements.exchangeRateTwdJpy.textContent = `${(1 / effectiveRate).toFixed(4)} JPY`;
-  if (state.exchange.manualRate) {
-    elements.exchangeUpdatedAt.textContent += " · 手動匯率中";
-  } else if (!liveRate) {
+  if (!liveRate) {
     elements.exchangeUpdatedAt.textContent = "尚未更新 · 使用預設匯率";
   }
   renderConverter();
@@ -616,7 +679,7 @@ function renderConverter() {
 }
 
 function getEffectiveRate() {
-  return state.exchange.manualRate || state.exchange.liveRate || FALLBACK_JPY_TO_TWD;
+  return state.exchange.liveRate || FALLBACK_JPY_TO_TWD;
 }
 
 async function refreshRemoteData({ silent }) {
@@ -673,6 +736,15 @@ function registerServiceWorker() {
     return;
   }
 
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => registration.unregister());
+    }).catch((error) => {
+      console.error("service worker cleanup failed", error);
+    });
+    return;
+  }
+
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./service-worker.js").catch((error) => {
       console.error("service worker registration failed", error);
@@ -703,6 +775,29 @@ function formatDayLabel(dateString) {
     month: "numeric",
     day: "numeric",
     weekday: "short"
+  }).format(date);
+}
+
+function buildWeatherRangeMessage(forecastDates) {
+  const firstForecast = forecastDates[0];
+  const lastForecast = forecastDates[forecastDates.length - 1];
+  const tripStart = TRIP_DATES[0];
+  const tripEnd = TRIP_DATES[TRIP_DATES.length - 1];
+  const coversTrip = tripStart >= firstForecast && tripEnd <= lastForecast;
+
+  if (coversTrip) {
+    return `目前天氣資料已經涵蓋你的行程日期 ${formatShortDate(tripStart)} 到 ${formatShortDate(tripEnd)}，這一區塊看到的就是旅行期間預報。`;
+  }
+
+  return `目前顯示的是 ${formatShortDate(firstForecast)} 到 ${formatShortDate(lastForecast)} 的近期預報，不是 ${formatShortDate(tripStart)} 到 ${formatShortDate(tripEnd)} 的正式行程天氣。今天是 2026/05/27，你的旅行日期還沒進入 7 天預報範圍，所以現在只能先看近期天況做參考。`;
+}
+
+function formatShortDate(dateString) {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat("zh-TW", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
   }).format(date);
 }
 

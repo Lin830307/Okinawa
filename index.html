@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#0077b6">
   <meta name="description" content="沖繩行程 PWA，包含每日行程、行前清單、記帳、天氣與匯率。">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -38,6 +38,7 @@
         <button class="top-tab" data-tab="expenses">記帳</button>
         <button class="top-tab" data-tab="weather">天氣</button>
         <button class="top-tab" data-tab="exchange">匯率</button>
+        <button class="top-tab" data-tab="sync">同步</button>
       </nav>
 
       <section id="tab-itinerary" class="tab-panel is-active">
@@ -47,7 +48,6 @@
               <p class="section-kicker">Daily Plan</p>
               <h2>每日行程</h2>
             </div>
-            <p id="trip-progress-summary" class="pill pill--accent">總完成度 0%</p>
           </div>
           <div id="day-tabs" class="day-tabs" aria-label="每日行程切換"></div>
           <div id="day-view" class="day-view"></div>
@@ -61,7 +61,6 @@
               <p class="section-kicker">Before You Go</p>
               <h2>行前清單</h2>
             </div>
-            <p id="checklist-progress" class="pill">0 / 0 已完成</p>
           </div>
           <form id="checklist-form" class="inline-form">
             <input id="checklist-input" type="text" maxlength="80" placeholder="加入要準備的項目，例如：防水手機袋">
@@ -123,14 +122,65 @@
                 <option value="TWD">TWD</option>
               </select>
             </label>
-            <label class="expense-form__wide">
-              <span>備註</span>
-              <input id="expense-note" type="text" maxlength="80" placeholder="例如：A&W 午餐、停車費、藥妝">
+            <label>
+              <span>付款人</span>
+              <select id="expense-payer">
+                <option>YY</option>
+                <option>Henry</option>
+              </select>
             </label>
-            <button class="button" type="submit">新增支出</button>
+            <label class="expense-form__wide expense-note-row">
+              <span>備註</span>
+              <div class="expense-note-action">
+                <input id="expense-note" type="text" maxlength="80" placeholder="例如：A&W 午餐、停車費、藥妝">
+                <button class="icon-button icon-button--add expense-add-button" type="submit" aria-label="新增支出" title="新增支出">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                </button>
+              </div>
+            </label>
           </form>
 
-          <div id="expense-items" class="stack-list"></div>
+          <section class="expense-records-panel">
+          <div class="expense-section-header">
+            <div>
+              <p class="section-kicker">Saved Expenses</p>
+              <h3>已記錄支出</h3>
+            </div>
+            <div class="expense-filter-bar">
+              <label class="expense-filter">
+                <span>日期</span>
+                <select id="expense-filter-date">
+                  <option value="ALL">全部</option>
+                </select>
+              </label>
+              <label class="expense-filter">
+                <span>付款人</span>
+                <select id="expense-filter-payer">
+                  <option value="ALL">全部</option>
+                  <option value="YY">YY</option>
+                  <option value="Henry">Henry</option>
+                </select>
+              </label>
+              <label class="expense-filter">
+                <span>類別</span>
+                <select id="expense-filter-category">
+                  <option value="ALL">全部</option>
+                  <option value="交通">交通</option>
+                  <option value="餐飲">餐飲</option>
+                  <option value="住宿">住宿</option>
+                  <option value="購物">購物</option>
+                  <option value="門票">門票</option>
+                  <option value="其他">其他</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <p class="expense-section-note" id="expense-filter-summary">目前顯示全部支出統計。</p>
+          <div id="expense-items" class="stack-list expense-list"></div>
+          </section>
         </section>
       </section>
 
@@ -148,6 +198,7 @@
             <button class="button" type="submit">更新天氣</button>
           </form>
           <p class="helper-text">使用 Open-Meteo 即時資料。若旅行日期超過 API 可預報範圍，會先顯示最近可取得的天氣。</p>
+          <div id="weather-range-note" class="notice-card"></div>
           <div class="weather-current">
             <article class="weather-card weather-card--current">
               <span>目前概況</span>
@@ -190,17 +241,6 @@
             </article>
           </div>
 
-          <form id="exchange-form" class="exchange-form">
-            <label>
-              <span>手動匯率（1 JPY = ? TWD）</span>
-              <input id="manual-rate" type="number" min="0" step="0.0001" placeholder="例如 0.2145">
-            </label>
-            <div class="form-row">
-              <button class="button" type="submit">套用手動匯率</button>
-              <button id="clear-manual-rate" class="button button--ghost" type="button">改回即時匯率</button>
-            </div>
-          </form>
-
           <form id="converter-form" class="expense-form">
             <label>
               <span>輸入金額</span>
@@ -220,26 +260,86 @@
           </div>
         </section>
       </section>
+
+      <section id="tab-sync" class="tab-panel">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Shared Mode</p>
+              <h2>共用同步</h2>
+            </div>
+            <p id="sync-status-pill" class="pill">未啟用</p>
+          </div>
+          <div id="sync-setup-note" class="sync-intro-card">
+            <div>
+              <p class="sync-intro-card__title">建立你們的旅伴房間</p>
+              <p class="sync-intro-card__text">輸入同一組房間代碼，兩個人就能看到同一份旅遊記帳與行前清單。</p>
+            </div>
+            <div class="pill pill--accent">1 個代碼就能共用</div>
+          </div>
+          <form id="sync-form" class="expense-form">
+            <label class="expense-form__wide">
+              <span>共用房間代碼</span>
+              <input id="sync-room-id" type="text" maxlength="80" placeholder="例如 okinawa-family-2026">
+            </label>
+            <div class="form-row expense-form__wide sync-actions">
+              <button class="button" type="submit">啟用同步</button>
+              <button id="disconnect-sync-button" class="button button--ghost" type="button">改回本機模式</button>
+              <button id="copy-share-link-button" class="button button--ghost" type="button">複製共用連結</button>
+            </div>
+          </form>
+          <div class="sync-grid">
+            <article class="sync-info-card sync-info-card--active">
+              <div class="sync-info-card__badge">會同步</div>
+              <div>
+                <p class="sync-info-card__title">記帳、行前清單</p>
+                <p class="sync-info-card__text">旅伴使用同一組 room code，就會看到同一份資料。</p>
+              </div>
+            </article>
+            <article class="sync-info-card">
+              <div class="sync-info-card__badge sync-info-card__badge--soft">不共用</div>
+              <div>
+                <p class="sync-info-card__title">天氣、匯率、目前頁面位置</p>
+                <p class="sync-info-card__text">這些仍保留每台裝置自己的畫面狀態，避免互相干擾。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
   <template id="itinerary-card-template">
     <article class="itinerary-card">
-      <label class="itinerary-card__check">
-        <input type="checkbox">
-        <span></span>
-      </label>
-      <div class="itinerary-card__body">
-        <div class="itinerary-card__topline">
-          <p class="itinerary-card__time"></p>
-          <a class="map-link" target="_blank" rel="noreferrer noopener">地圖</a>
+      <div class="itinerary-card__rail"></div>
+      <div class="itinerary-card__summary">
+        <div class="itinerary-card__heading">
+          <h3></h3>
         </div>
-        <h3></h3>
-        <p class="itinerary-card__note"></p>
+      </div>
+      <div class="itinerary-card__body">
+        <div class="itinerary-card__detail">
+          <p class="itinerary-card__label">營業時間 / 建議時段</p>
+          <p class="itinerary-card__time"></p>
+        </div>
+        <div class="itinerary-card__detail">
+          <p class="itinerary-card__label">小提醒</p>
+          <p class="itinerary-card__note"></p>
+        </div>
+        <a class="map-link map-icon-button" target="_blank" rel="noreferrer noopener" aria-label="查看地圖" title="查看地圖">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M9 18l-5 2V6l5-2 6 2 5-2v14l-5 2-6-2z"></path>
+            <path d="M9 4v14"></path>
+            <path d="M15 6v14"></path>
+          </svg>
+        </a>
       </div>
     </article>
   </template>
 
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
