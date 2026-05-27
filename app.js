@@ -1,6 +1,9 @@
 const STORAGE_KEY = "okinawa-pwa-state-v1";
 const DEFAULT_CITY = "Onna, Okinawa";
 const FALLBACK_JPY_TO_TWD = 0.214;
+const ROOM_QUERY = new URLSearchParams(window.location.search).get("room");
+const DEFAULT_SYNC_ROOM = sanitizeRoomId(ROOM_QUERY) || "okinawa-shared-trip";
+const FIREBASE_COLLECTION_NAME = window.TRIP_FIREBASE_OPTIONS?.collectionName || "sharedTrips";
 const TRIP_DATES = [
   "2026-06-13",
   "2026-06-14",
@@ -182,6 +185,12 @@ const defaultChecklist = [
 
 const state = loadState();
 let deferredInstallPrompt = null;
+let firebaseApp = null;
+let firestoreDb = null;
+let syncUnsubscribe = null;
+let isApplyingRemoteSync = false;
+let lastPushedSyncRevision = null;
+let syncPushTimer = null;
 
 const elements = {
   topTabs: [...document.querySelectorAll(".top-tab")],
@@ -217,6 +226,12 @@ const elements = {
   converterAmount: document.getElementById("convert-amount"),
   converterDirection: document.getElementById("convert-direction"),
   converterOutput: document.getElementById("converter-output"),
+  syncForm: document.getElementById("sync-form"),
+  syncRoomId: document.getElementById("sync-room-id"),
+  syncStatusPill: document.getElementById("sync-status-pill"),
+  syncSetupNote: document.getElementById("sync-setup-note"),
+  disconnectSyncButton: document.getElementById("disconnect-sync-button"),
+  copyShareLinkButton: document.getElementById("copy-share-link-button"),
   installButton: document.getElementById("install-button"),
   refreshDataButton: document.getElementById("refresh-data-button")
 };
@@ -224,6 +239,7 @@ const elements = {
 bindEvents();
 renderAll();
 registerServiceWorker();
+void bootstrapSync();
 void refreshRemoteData({ silent: true });
 
 function loadState() {
@@ -243,6 +259,7 @@ function loadState() {
       checklist: mergedChecklist.length ? mergedChecklist : defaultChecklist,
       expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
       expenseFilters: parsed.expenseFilters || { date: "ALL", payer: "ALL", category: "ALL" },
+      sync: createSyncState(parsed.sync),
       weather: parsed.weather || { location: DEFAULT_CITY, forecast: null, updatedAt: null },
       exchange: parsed.exchange || { liveRate: null, updatedAt: null }
     };
@@ -259,8 +276,19 @@ function createInitialState() {
     checklist: mergeChecklistWithDefaults([]),
     expenses: [],
     expenseFilters: { date: "ALL", payer: "ALL", category: "ALL" },
+    sync: createSyncState(),
     weather: { location: DEFAULT_CITY, forecast: null, updatedAt: null },
     exchange: { liveRate: null, updatedAt: null }
+  };
+}
+
+function createSyncState(savedSync = {}) {
+  const roomId = sanitizeRoomId(ROOM_QUERY) || sanitizeRoomId(savedSync.roomId) || DEFAULT_SYNC_ROOM;
+  return {
+    enabled: ROOM_QUERY ? true : Boolean(savedSync.enabled),
+    roomId,
+    connected: false,
+    lastSyncedAt: savedSync.lastSyncedAt || null
   };
 }
 
@@ -279,7 +307,34 @@ function mergeChecklistWithDefaults(currentChecklist) {
 }
 
 function saveState() {
+  saveStateWithoutSync();
+  scheduleSharedStatePush();
+}
+
+function saveStateWithoutSync() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function scheduleSharedStatePush() {
+  if (!state.sync?.enabled || !state.sync?.connected || !hasFirebaseConfig() || isApplyingRemoteSync) {
+    return;
+  }
+
+  if (syncPushTimer) {
+    window.clearTimeout(syncPushTimer);
+  }
+
+  syncPushTimer = window.setTimeout(async () => {
+    syncPushTimer = null;
+    try {
+      await pushSharedState(false);
+    } catch (error) {
+      console.error("firebase sync push failed", error);
+      state.sync.connected = false;
+      saveStateWithoutSync();
+      renderSync();
+    }
+  }, 260);
 }
 
 function bindEvents() {
@@ -348,6 +403,36 @@ function bindEvents() {
     await refreshRemoteData({ silent: false });
   });
 
+  elements.syncForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    state.sync.roomId = sanitizeRoomId(elements.syncRoomId.value) || DEFAULT_SYNC_ROOM;
+    state.sync.enabled = true;
+    saveStateWithoutSync();
+    updateRoomUrl(state.sync.roomId);
+    await startSharedSync();
+  });
+
+  elements.disconnectSyncButton.addEventListener("click", () => {
+    stopSharedSync();
+    state.sync.enabled = false;
+    state.sync.connected = false;
+    saveStateWithoutSync();
+    clearRoomUrl();
+    renderSync();
+  });
+
+  elements.copyShareLinkButton.addEventListener("click", async () => {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.searchParams.set("room", sanitizeRoomId(state.sync.roomId) || DEFAULT_SYNC_ROOM);
+    try {
+      await navigator.clipboard.writeText(shareUrl.toString());
+      elements.syncStatusPill.textContent = "連結已複製";
+      window.setTimeout(() => renderSync(), 1200);
+    } catch (error) {
+      window.prompt("請手動複製這個共用連結", shareUrl.toString());
+    }
+  });
+
   elements.expenseFilterDate.addEventListener("change", () => {
     state.expenseFilters.date = elements.expenseFilterDate.value;
     saveState();
@@ -391,6 +476,7 @@ function renderAll() {
   renderExpenses();
   renderWeather();
   renderExchange();
+  renderSync();
   document.getElementById("expense-date").value ||= "2026-06-13";
 }
 
@@ -617,6 +703,59 @@ function renderExpenseDateFilterOptions() {
   }
 }
 
+function renderSync() {
+  if (!elements.syncRoomId) {
+    return;
+  }
+
+  elements.syncRoomId.value = state.sync?.roomId || DEFAULT_SYNC_ROOM;
+
+  if (!hasFirebaseConfig()) {
+    elements.syncStatusPill.textContent = "待設定";
+    elements.syncSetupNote.innerHTML = `
+      <div>
+        <p class="sync-intro-card__title">先填 Firebase 設定</p>
+        <p class="sync-intro-card__text">把你的 Firebase Web App 設定貼到 <code>firebase-config.js</code>，就能開啟旅伴同步。</p>
+      </div>
+      <div class="pill pill--accent">尚未連線</div>
+    `;
+    return;
+  }
+
+  if (!state.sync?.enabled) {
+    elements.syncStatusPill.textContent = "未啟用";
+    elements.syncSetupNote.innerHTML = `
+      <div>
+        <p class="sync-intro-card__title">建立你們的旅伴房間</p>
+        <p class="sync-intro-card__text">輸入同一組房間代碼，例如 <code>okinawa-family-2026</code>，你和旅伴就能共用記帳與清單。</p>
+      </div>
+      <div class="pill pill--accent">1 個代碼就能共用</div>
+    `;
+    return;
+  }
+
+  if (state.sync.connected) {
+    elements.syncStatusPill.textContent = "同步中";
+    elements.syncSetupNote.innerHTML = `
+      <div>
+        <p class="sync-intro-card__title">已連到房間 <code>${state.sync.roomId}</code></p>
+        <p class="sync-intro-card__text">把同一個 room code 或分享連結給旅伴，雙方會看到同一份記帳與清單。</p>
+      </div>
+      <div class="pill pill--accent">${state.sync.lastSyncedAt ? `最近同步 ${formatTimestamp(state.sync.lastSyncedAt)}` : "即時同步啟用"}</div>
+    `;
+    return;
+  }
+
+  elements.syncStatusPill.textContent = "連線中斷";
+  elements.syncSetupNote.innerHTML = `
+    <div>
+      <p class="sync-intro-card__title">尚未連上 Firestore</p>
+      <p class="sync-intro-card__text">請檢查 Firebase 設定與 Firestore 安全規則，或再按一次啟用同步。</p>
+    </div>
+    <div class="pill pill--accent">房間 ${state.sync.roomId}</div>
+  `;
+}
+
 function renderWeather() {
   elements.weatherLocation.value = state.weather.location;
   if (!state.weather.forecast) {
@@ -731,6 +870,117 @@ async function refreshExchange() {
   }
 }
 
+async function bootstrapSync() {
+  if (!state.sync?.enabled || !hasFirebaseConfig()) {
+    renderSync();
+    return;
+  }
+
+  await startSharedSync();
+}
+
+async function startSharedSync() {
+  if (!hasFirebaseConfig()) {
+    renderSync();
+    return;
+  }
+
+  try {
+    ensureFirebase();
+    stopSharedSync(false);
+    const docRef = firestoreDb.collection(FIREBASE_COLLECTION_NAME).doc(state.sync.roomId);
+
+    syncUnsubscribe = docRef.onSnapshot(async (snapshot) => {
+      if (!snapshot.exists) {
+        state.sync.connected = true;
+        state.sync.lastSyncedAt = Date.now();
+        saveStateWithoutSync();
+        await pushSharedState(true);
+        renderSync();
+        return;
+      }
+
+      const remote = snapshot.data() || {};
+      const sharedState = remote.sharedState || {};
+      const revision = remote.revision || null;
+
+      state.sync.connected = true;
+      state.sync.lastSyncedAt = remote.updatedAt || Date.now();
+
+      if (revision && revision === lastPushedSyncRevision) {
+        saveStateWithoutSync();
+        renderSync();
+        return;
+      }
+
+      isApplyingRemoteSync = true;
+      lastPushedSyncRevision = revision;
+      state.checklist = mergeChecklistWithDefaults(Array.isArray(sharedState.checklist) ? sharedState.checklist : state.checklist);
+      state.expenses = Array.isArray(sharedState.expenses) ? sharedState.expenses : state.expenses;
+      saveStateWithoutSync();
+      renderChecklist();
+      renderExpenses();
+      renderSync();
+      isApplyingRemoteSync = false;
+    }, (error) => {
+      console.error("firebase sync listener failed", error);
+      state.sync.connected = false;
+      saveStateWithoutSync();
+      renderSync();
+    });
+
+    state.sync.connected = true;
+    saveStateWithoutSync();
+    renderSync();
+    await pushSharedState(false);
+  } catch (error) {
+    console.error("firebase sync start failed", error);
+    state.sync.connected = false;
+    saveStateWithoutSync();
+    renderSync();
+  }
+}
+
+function stopSharedSync(clearEnabled = false) {
+  if (syncPushTimer) {
+    window.clearTimeout(syncPushTimer);
+    syncPushTimer = null;
+  }
+
+  if (syncUnsubscribe) {
+    syncUnsubscribe();
+    syncUnsubscribe = null;
+  }
+
+  state.sync.connected = false;
+  if (clearEnabled) {
+    state.sync.enabled = false;
+  }
+}
+
+async function pushSharedState(force) {
+  if (!force && (!state.sync?.enabled || !state.sync?.connected || !hasFirebaseConfig() || isApplyingRemoteSync)) {
+    return;
+  }
+
+  ensureFirebase();
+  const revision = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  lastPushedSyncRevision = revision;
+
+  await firestoreDb.collection(FIREBASE_COLLECTION_NAME).doc(state.sync.roomId).set({
+    revision,
+    updatedAt: Date.now(),
+    sharedState: {
+      checklist: state.checklist,
+      expenses: state.expenses
+    }
+  }, { merge: true });
+
+  state.sync.lastSyncedAt = Date.now();
+  saveStateWithoutSync();
+  renderSync();
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) {
     return;
@@ -750,6 +1000,46 @@ function registerServiceWorker() {
       console.error("service worker registration failed", error);
     });
   });
+}
+
+function ensureFirebase() {
+  if (firestoreDb) {
+    return firestoreDb;
+  }
+
+  if (!window.firebase) {
+    throw new Error("Firebase SDK is not loaded.");
+  }
+
+  firebaseApp = window.firebase.apps.length
+    ? window.firebase.app()
+    : window.firebase.initializeApp(window.TRIP_FIREBASE_CONFIG);
+  firestoreDb = window.firebase.firestore(firebaseApp);
+  return firestoreDb;
+}
+
+function hasFirebaseConfig() {
+  return Boolean(window.TRIP_FIREBASE_CONFIG?.projectId);
+}
+
+function sanitizeRoomId(value) {
+  return (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function updateRoomUrl(roomId) {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("room", roomId);
+  window.history.replaceState({}, "", nextUrl.toString());
+}
+
+function clearRoomUrl() {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.delete("room");
+  window.history.replaceState({}, "", nextUrl.toString());
 }
 
 function formatCurrency(value, currency) {

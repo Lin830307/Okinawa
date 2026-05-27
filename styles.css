@@ -713,6 +713,7 @@ select {
 .expense-entry__label-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   min-width: 0;
 }
@@ -726,6 +727,7 @@ select {
   color: #0b63a0;
   font-size: 0.9rem;
   font-weight: 700;
+  max-width: 100%;
 }
 
 .expense-entry__chip {
@@ -738,6 +740,7 @@ select {
   font-size: 0.84rem;
   font-weight: 600;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .expense-entry__chip--date {
@@ -764,6 +767,8 @@ select {
 }
 
 .expense-entry__inline-note {
+  flex: 1 1 140px;
+  min-width: 0;
   color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.5;
@@ -777,6 +782,7 @@ select {
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .expense-entry__actions {
@@ -1003,6 +1009,12 @@ select {
   .expense-entry__label-row {
     width: 100%;
     flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .expense-entry__chip,
+  .expense-entry__category {
+    white-space: normal;
   }
 
   .expense-entry__actions {
