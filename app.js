@@ -889,9 +889,11 @@ async function startSharedSync() {
     ensureFirebase();
     stopSharedSync(false);
     const docRef = firestoreDb.collection(FIREBASE_COLLECTION_NAME).doc(state.sync.roomId);
+    let hasResolvedInitialSnapshot = false;
 
     syncUnsubscribe = docRef.onSnapshot(async (snapshot) => {
       if (!snapshot.exists) {
+        hasResolvedInitialSnapshot = true;
         state.sync.connected = true;
         state.sync.lastSyncedAt = Date.now();
         saveStateWithoutSync();
@@ -903,6 +905,7 @@ async function startSharedSync() {
       const remote = snapshot.data() || {};
       const sharedState = remote.sharedState || {};
       const revision = remote.revision || null;
+      hasResolvedInitialSnapshot = true;
 
       state.sync.connected = true;
       state.sync.lastSyncedAt = remote.updatedAt || Date.now();
@@ -932,7 +935,18 @@ async function startSharedSync() {
     state.sync.connected = true;
     saveStateWithoutSync();
     renderSync();
-    await pushSharedState(false);
+
+    window.setTimeout(async () => {
+      if (hasResolvedInitialSnapshot) {
+        return;
+      }
+
+      try {
+        await pushSharedState(false);
+      } catch (error) {
+        console.error("firebase initial sync fallback failed", error);
+      }
+    }, 1500);
   } catch (error) {
     console.error("firebase sync start failed", error);
     state.sync.connected = false;
