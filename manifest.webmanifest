@@ -1,0 +1,24 @@
+{
+  "name": "沖繩行程 PWA",
+  "short_name": "沖繩行程",
+  "description": "可安裝的沖繩自駕旅遊小工具，包含行程、行前清單、記帳、天氣與匯率。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6fbfa",
+  "theme_color": "#0f766e",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

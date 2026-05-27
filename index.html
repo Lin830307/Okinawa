@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="description" content="沖繩行程 PWA，包含每日行程、行前清單、記帳、天氣與匯率。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <title>沖繩行程 PWA</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero__glow hero__glow--one"></div>
+      <div class="hero__glow hero__glow--two"></div>
+      <div class="hero__content">
+        <p class="eyebrow">Okinawa Road Trip</p>
+        <h1>沖繩夏日自駕遊</h1>
+        <p class="hero__subtitle">5 天 4 夜的海景假期，現在也能離線打開、順手記帳、查天氣與匯率。</p>
+        <div class="hero__meta">
+          <span>2026/06/13 - 2026/06/17</span>
+          <span>那霸・萬座・古宇利</span>
+        </div>
+        <div class="hero__actions">
+          <button id="install-button" class="button button--light" hidden>安裝到主畫面</button>
+          <button id="refresh-data-button" class="button button--ghost">更新天氣 / 匯率</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <nav class="top-tabs" aria-label="主頁籤">
+        <button class="top-tab is-active" data-tab="itinerary">行程</button>
+        <button class="top-tab" data-tab="checklist">行前</button>
+        <button class="top-tab" data-tab="expenses">記帳</button>
+        <button class="top-tab" data-tab="weather">天氣</button>
+        <button class="top-tab" data-tab="exchange">匯率</button>
+      </nav>
+
+      <section id="tab-itinerary" class="tab-panel is-active">
+        <section class="panel panel--soft">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Daily Plan</p>
+              <h2>每日行程</h2>
+            </div>
+            <p id="trip-progress-summary" class="pill pill--accent">總完成度 0%</p>
+          </div>
+          <div id="day-tabs" class="day-tabs" aria-label="每日行程切換"></div>
+          <div id="day-view" class="day-view"></div>
+        </section>
+      </section>
+
+      <section id="tab-checklist" class="tab-panel">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Before You Go</p>
+              <h2>行前清單</h2>
+            </div>
+            <p id="checklist-progress" class="pill">0 / 0 已完成</p>
+          </div>
+          <form id="checklist-form" class="inline-form">
+            <input id="checklist-input" type="text" maxlength="80" placeholder="加入要準備的項目，例如：防水手機袋">
+            <button class="button" type="submit">新增項目</button>
+          </form>
+          <p class="helper-text">每個項目都可以勾選、重新命名或刪除，資料會自動保存在裝置上。</p>
+          <div id="checklist-items" class="stack-list"></div>
+        </section>
+      </section>
+
+      <section id="tab-expenses" class="tab-panel">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Budget Log</p>
+              <h2>旅遊記帳</h2>
+            </div>
+            <p id="expense-count" class="pill">0 筆支出</p>
+          </div>
+          <div class="summary-grid">
+            <article class="summary-card">
+              <span>總支出 JPY</span>
+              <strong id="expense-total-jpy">¥0</strong>
+            </article>
+            <article class="summary-card">
+              <span>估算 TWD</span>
+              <strong id="expense-total-twd">NT$0</strong>
+            </article>
+            <article class="summary-card">
+              <span>平均每筆</span>
+              <strong id="expense-average">¥0</strong>
+            </article>
+          </div>
+
+          <form id="expense-form" class="expense-form">
+            <label>
+              <span>日期</span>
+              <input id="expense-date" type="date" required>
+            </label>
+            <label>
+              <span>分類</span>
+              <select id="expense-category">
+                <option>交通</option>
+                <option>餐飲</option>
+                <option>住宿</option>
+                <option>購物</option>
+                <option>門票</option>
+                <option>其他</option>
+              </select>
+            </label>
+            <label>
+              <span>金額</span>
+              <input id="expense-amount" type="number" min="0" step="1" required placeholder="例如 2500">
+            </label>
+            <label>
+              <span>幣別</span>
+              <select id="expense-currency">
+                <option value="JPY">JPY</option>
+                <option value="TWD">TWD</option>
+              </select>
+            </label>
+            <label class="expense-form__wide">
+              <span>備註</span>
+              <input id="expense-note" type="text" maxlength="80" placeholder="例如：A&W 午餐、停車費、藥妝">
+            </label>
+            <button class="button" type="submit">新增支出</button>
+          </form>
+
+          <div id="expense-items" class="stack-list"></div>
+        </section>
+      </section>
+
+      <section id="tab-weather" class="tab-panel">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Weather Watch</p>
+              <h2>沖繩天氣</h2>
+            </div>
+            <p id="weather-updated-at" class="pill">尚未更新</p>
+          </div>
+          <form id="weather-form" class="inline-form">
+            <input id="weather-location" type="text" value="Naha, Okinawa" placeholder="輸入地點，例如 Naha, Okinawa">
+            <button class="button" type="submit">更新天氣</button>
+          </form>
+          <p class="helper-text">使用 Open-Meteo 即時資料。若旅行日期超過 API 可預報範圍，會先顯示最近可取得的天氣。</p>
+          <div class="weather-current">
+            <article class="weather-card weather-card--current">
+              <span>目前概況</span>
+              <strong id="weather-current-temp">--</strong>
+              <p id="weather-current-text">等待更新</p>
+            </article>
+            <article class="weather-card">
+              <span>降雨機率</span>
+              <strong id="weather-current-rain">--</strong>
+              <p>近期預報最高值</p>
+            </article>
+            <article class="weather-card">
+              <span>風速</span>
+              <strong id="weather-current-wind">--</strong>
+              <p>10m 高度</p>
+            </article>
+          </div>
+          <div id="weather-forecast" class="forecast-grid"></div>
+        </section>
+      </section>
+
+      <section id="tab-exchange" class="tab-panel">
+        <section class="panel">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Money</p>
+              <h2>匯率換算</h2>
+            </div>
+            <p id="exchange-updated-at" class="pill">尚未更新</p>
+          </div>
+
+          <div class="exchange-grid">
+            <article class="exchange-card">
+              <span>1 TWD</span>
+              <strong id="exchange-rate-twd-jpy">-- JPY</strong>
+            </article>
+            <article class="exchange-card">
+              <span>1 JPY</span>
+              <strong id="exchange-rate-jpy-twd">-- TWD</strong>
+            </article>
+          </div>
+
+          <form id="exchange-form" class="exchange-form">
+            <label>
+              <span>手動匯率（1 JPY = ? TWD）</span>
+              <input id="manual-rate" type="number" min="0" step="0.0001" placeholder="例如 0.2145">
+            </label>
+            <div class="form-row">
+              <button class="button" type="submit">套用手動匯率</button>
+              <button id="clear-manual-rate" class="button button--ghost" type="button">改回即時匯率</button>
+            </div>
+          </form>
+
+          <form id="converter-form" class="expense-form">
+            <label>
+              <span>輸入金額</span>
+              <input id="convert-amount" type="number" min="0" step="1" value="1000">
+            </label>
+            <label>
+              <span>方向</span>
+              <select id="convert-direction">
+                <option value="JPY_TO_TWD">JPY → TWD</option>
+                <option value="TWD_TO_JPY">TWD → JPY</option>
+              </select>
+            </label>
+            <button class="button" type="submit">立即換算</button>
+          </form>
+          <div class="converter-result">
+            <p id="converter-output">1000 JPY ≈ NT$0</p>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <template id="itinerary-card-template">
+    <article class="itinerary-card">
+      <label class="itinerary-card__check">
+        <input type="checkbox">
+        <span></span>
+      </label>
+      <div class="itinerary-card__body">
+        <div class="itinerary-card__topline">
+          <p class="itinerary-card__time"></p>
+          <a class="map-link" target="_blank" rel="noreferrer noopener">地圖</a>
+        </div>
+        <h3></h3>
+        <p class="itinerary-card__note"></p>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
