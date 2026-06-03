@@ -191,15 +191,35 @@ let syncUnsubscribe = null;
 let isApplyingRemoteSync = false;
 let lastPushedSyncRevision = null;
 let syncPushTimer = null;
+let editingItineraryItem = null;
 
 const elements = {
   topTabs: [...document.querySelectorAll(".top-tab")],
   panels: [...document.querySelectorAll(".tab-panel")],
+  openItineraryDialogButton: document.getElementById("open-itinerary-dialog-button"),
+  itineraryDialog: document.getElementById("itinerary-dialog"),
+  itineraryDialogTitle: document.getElementById("itinerary-dialog-title"),
+  itineraryDialogCloseButton: document.getElementById("itinerary-dialog-close-button"),
+  itineraryForm: document.getElementById("itinerary-form"),
+  itineraryTime: document.getElementById("itinerary-time"),
+  itineraryTitle: document.getElementById("itinerary-title"),
+  itineraryNote: document.getElementById("itinerary-note"),
+  itineraryMap: document.getElementById("itinerary-map"),
+  itinerarySubmitButton: document.getElementById("itinerary-submit-button"),
+  itineraryCancelEditButton: document.getElementById("itinerary-cancel-edit-button"),
   dayTabs: document.getElementById("day-tabs"),
   dayView: document.getElementById("day-view"),
+  openChecklistDialogButton: document.getElementById("open-checklist-dialog-button"),
+  checklistDialog: document.getElementById("checklist-dialog"),
+  checklistDialogCloseButton: document.getElementById("checklist-dialog-close-button"),
+  checklistCancelButton: document.getElementById("checklist-cancel-button"),
   checklistForm: document.getElementById("checklist-form"),
   checklistInput: document.getElementById("checklist-input"),
   checklistItems: document.getElementById("checklist-items"),
+  openExpenseDialogButton: document.getElementById("open-expense-dialog-button"),
+  expenseDialog: document.getElementById("expense-dialog"),
+  expenseDialogCloseButton: document.getElementById("expense-dialog-close-button"),
+  expenseCancelButton: document.getElementById("expense-cancel-button"),
   expenseForm: document.getElementById("expense-form"),
   expenseItems: document.getElementById("expense-items"),
   expenseCount: document.getElementById("expense-count"),
@@ -256,6 +276,7 @@ function loadState() {
     return {
       activeTab: parsed.activeTab || "itinerary",
       activeDay: parsed.activeDay || 1,
+      itinerary: normalizeItinerary(parsed.itinerary),
       checklist: mergedChecklist.length ? mergedChecklist : defaultChecklist,
       expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
       expenseFilters: parsed.expenseFilters || { date: "ALL", payer: "ALL", category: "ALL" },
@@ -273,6 +294,7 @@ function createInitialState() {
   return {
     activeTab: "itinerary",
     activeDay: 1,
+    itinerary: normalizeItinerary(),
     checklist: mergeChecklistWithDefaults([]),
     expenses: [],
     expenseFilters: { date: "ALL", payer: "ALL", category: "ALL" },
@@ -304,6 +326,28 @@ function mergeChecklistWithDefaults(currentChecklist) {
     .map((item) => ({ ...item, id: crypto.randomUUID() }));
 
   return [...currentChecklist, ...missingDefaults];
+}
+
+function normalizeItinerary(value) {
+  const source = Array.isArray(value) && value.length ? value : itineraryData;
+  return source.map((day, dayIndex) => {
+    const fallbackDay = itineraryData[dayIndex] || itineraryData[0];
+    return {
+      id: Number(day?.id) || fallbackDay.id || dayIndex + 1,
+      label: day?.label || fallbackDay.label || `DAY ${dayIndex + 1}`,
+      date: day?.date || fallbackDay.date || "",
+      title: day?.title || fallbackDay.title || "自由行程",
+      items: Array.isArray(day?.items)
+        ? day.items.map((item) => ({
+            id: item?.id || crypto.randomUUID(),
+            time: item?.time || "自由安排",
+            title: item?.title || "未命名景點",
+            note: item?.note || "可依當天體力與天氣彈性調整。",
+            map: normalizeMapValue(item?.map, item?.title || "Okinawa")
+          }))
+        : []
+    };
+  });
 }
 
 function saveState() {
@@ -346,6 +390,78 @@ function bindEvents() {
     });
   });
 
+  elements.openItineraryDialogButton.addEventListener("click", () => {
+    elements.itineraryForm.reset();
+    clearItineraryEditState();
+    openItineraryDialog("新增景點");
+  });
+
+  elements.itineraryDialogCloseButton.addEventListener("click", () => {
+    closeItineraryDialog();
+  });
+
+  elements.itineraryDialog.addEventListener("click", (event) => {
+    if (event.target === elements.itineraryDialog) {
+      closeItineraryDialog();
+    }
+  });
+
+  elements.itineraryForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const title = elements.itineraryTitle.value.trim();
+    if (!title) {
+      return;
+    }
+
+    const activeDay = getActiveDay();
+    const nextItem = {
+      id: editingItineraryItem?.itemId || crypto.randomUUID(),
+      time: elements.itineraryTime.value.trim() || "自由安排",
+      title,
+      note: elements.itineraryNote.value.trim() || "可依當天體力與天氣彈性調整。",
+      map: normalizeMapValue(elements.itineraryMap.value, title)
+    };
+
+    if (editingItineraryItem) {
+      const editingDay = state.itinerary.find((day) => day.id === editingItineraryItem.dayId);
+      const itemIndex = editingDay?.items.findIndex((item) => item.id === editingItineraryItem.itemId) ?? -1;
+      if (editingDay && itemIndex >= 0) {
+        editingDay.items[itemIndex] = nextItem;
+      }
+      clearItineraryEditState();
+    } else {
+      activeDay.items.push(nextItem);
+    }
+
+    elements.itineraryForm.reset();
+    closeItineraryDialog();
+    saveState();
+    renderItinerary();
+  });
+
+  elements.itineraryCancelEditButton.addEventListener("click", () => {
+    elements.itineraryForm.reset();
+    closeItineraryDialog();
+  });
+
+  elements.openChecklistDialogButton.addEventListener("click", () => {
+    openChecklistDialog();
+  });
+
+  elements.checklistDialogCloseButton.addEventListener("click", () => {
+    closeChecklistDialog();
+  });
+
+  elements.checklistCancelButton.addEventListener("click", () => {
+    closeChecklistDialog();
+  });
+
+  elements.checklistDialog.addEventListener("click", (event) => {
+    if (event.target === elements.checklistDialog) {
+      closeChecklistDialog();
+    }
+  });
+
   elements.checklistForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const text = elements.checklistInput.value.trim();
@@ -355,8 +471,27 @@ function bindEvents() {
 
     state.checklist.unshift({ id: crypto.randomUUID(), text, done: false });
     elements.checklistInput.value = "";
+    closeChecklistDialog();
     saveState();
     renderChecklist();
+  });
+
+  elements.openExpenseDialogButton.addEventListener("click", () => {
+    openExpenseDialog();
+  });
+
+  elements.expenseDialogCloseButton.addEventListener("click", () => {
+    closeExpenseDialog();
+  });
+
+  elements.expenseCancelButton.addEventListener("click", () => {
+    closeExpenseDialog();
+  });
+
+  elements.expenseDialog.addEventListener("click", (event) => {
+    if (event.target === elements.expenseDialog) {
+      closeExpenseDialog();
+    }
   });
 
   elements.expenseForm.addEventListener("submit", (event) => {
@@ -383,6 +518,7 @@ function bindEvents() {
     document.getElementById("expense-date").value = "2026-06-13";
     document.getElementById("expense-currency").value = "JPY";
     document.getElementById("expense-payer").value = "YY";
+    closeExpenseDialog();
     saveState();
     renderExpenses();
   });
@@ -492,19 +628,23 @@ function renderTabs() {
 
 function renderItinerary() {
   elements.dayTabs.innerHTML = "";
-  itineraryData.forEach((day) => {
+  state.itinerary.forEach((day) => {
     const button = document.createElement("button");
     button.className = `day-tab${day.id === state.activeDay ? " is-active" : ""}`;
     button.textContent = day.label;
     button.addEventListener("click", () => {
       state.activeDay = day.id;
+      if (editingItineraryItem) {
+        elements.itineraryForm.reset();
+        closeItineraryDialog();
+      }
       saveState();
       renderItinerary();
     });
     elements.dayTabs.appendChild(button);
   });
 
-  const activeDay = itineraryData.find((day) => day.id === state.activeDay) || itineraryData[0];
+  const activeDay = getActiveDay();
   elements.dayView.innerHTML = "";
 
   const dayHeader = document.createElement("div");
@@ -514,6 +654,7 @@ function renderItinerary() {
       <p class="section-kicker">${activeDay.label} · ${activeDay.date}</p>
       <h3>${activeDay.title}</h3>
     </div>
+    <a class="button button--ghost route-link" href="${buildDayRouteUrl(activeDay)}" target="_blank" rel="noreferrer noopener">查看今日路線</a>
   `;
   elements.dayView.appendChild(dayHeader);
 
@@ -522,6 +663,11 @@ function renderItinerary() {
   elements.dayView.appendChild(timeline);
 
   const template = document.getElementById("itinerary-card-template");
+  if (!activeDay.items.length) {
+    timeline.innerHTML = `<div class="empty-state">這一天還沒有景點，先新增一個想去的地方吧。</div>`;
+    return;
+  }
+
   activeDay.items.forEach((item, index) => {
     const fragment = template.content.cloneNode(true);
     const card = fragment.querySelector(".itinerary-card");
@@ -529,15 +675,174 @@ function renderItinerary() {
     const title = fragment.querySelector("h3");
     const note = fragment.querySelector(".itinerary-card__note");
     const mapLink = fragment.querySelector(".map-link");
+    const moveUpButton = fragment.querySelector(".itinerary-move-up");
+    const moveDownButton = fragment.querySelector(".itinerary-move-down");
+    const editButton = fragment.querySelector(".itinerary-edit");
+    const deleteButton = fragment.querySelector(".itinerary-delete");
 
     card.classList.toggle("is-last", index === activeDay.items.length - 1);
     time.textContent = item.time;
     title.textContent = item.title;
     note.textContent = item.note;
     mapLink.href = item.map;
+    moveUpButton.disabled = index === 0;
+    moveDownButton.disabled = index === activeDay.items.length - 1;
+
+    moveUpButton.addEventListener("click", () => {
+      moveItineraryItem(activeDay.id, item.id, -1);
+    });
+
+    moveDownButton.addEventListener("click", () => {
+      moveItineraryItem(activeDay.id, item.id, 1);
+    });
+
+    editButton.addEventListener("click", () => {
+      editItineraryItem(activeDay.id, item.id);
+    });
+
+    deleteButton.addEventListener("click", () => {
+      activeDay.items = activeDay.items.filter((entry) => entry.id !== item.id);
+      if (editingItineraryItem?.itemId === item.id) {
+        elements.itineraryForm.reset();
+        closeItineraryDialog();
+      }
+      saveState();
+      renderItinerary();
+    });
 
     timeline.appendChild(fragment);
   });
+}
+
+function getActiveDay() {
+  return state.itinerary.find((day) => day.id === state.activeDay) || state.itinerary[0];
+}
+
+function moveItineraryItem(dayId, itemId, direction) {
+  const day = state.itinerary.find((entry) => entry.id === dayId);
+  if (!day) {
+    return;
+  }
+
+  const currentIndex = day.items.findIndex((item) => item.id === itemId);
+  const nextIndex = currentIndex + direction;
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= day.items.length) {
+    return;
+  }
+
+  const [item] = day.items.splice(currentIndex, 1);
+  day.items.splice(nextIndex, 0, item);
+  saveState();
+  renderItinerary();
+}
+
+function editItineraryItem(dayId, itemId) {
+  const day = state.itinerary.find((entry) => entry.id === dayId);
+  const item = day?.items.find((entry) => entry.id === itemId);
+  if (!item) {
+    return;
+  }
+
+  editingItineraryItem = { dayId, itemId };
+  elements.itineraryTime.value = item.time;
+  elements.itineraryTitle.value = item.title;
+  elements.itineraryNote.value = item.note;
+  elements.itineraryMap.value = item.map;
+  elements.itinerarySubmitButton.textContent = "儲存修改";
+  openItineraryDialog("編輯景點");
+}
+
+function clearItineraryEditState() {
+  editingItineraryItem = null;
+  elements.itineraryDialogTitle.textContent = "新增景點";
+  elements.itinerarySubmitButton.textContent = "新增景點";
+}
+
+function openItineraryDialog(title) {
+  elements.itineraryDialogTitle.textContent = title;
+  elements.itineraryDialog.hidden = false;
+  elements.itineraryDialog.classList.add("is-open");
+  elements.itineraryTitle.focus();
+}
+
+function closeItineraryDialog() {
+  clearItineraryEditState();
+  elements.itineraryDialog.classList.remove("is-open");
+  elements.itineraryDialog.hidden = true;
+}
+
+function openChecklistDialog() {
+  elements.checklistDialog.hidden = false;
+  elements.checklistDialog.classList.add("is-open");
+  elements.checklistInput.focus();
+}
+
+function closeChecklistDialog() {
+  elements.checklistDialog.classList.remove("is-open");
+  elements.checklistDialog.hidden = true;
+}
+
+function openExpenseDialog() {
+  document.getElementById("expense-date").value ||= "2026-06-13";
+  document.getElementById("expense-currency").value ||= "JPY";
+  document.getElementById("expense-payer").value ||= "YY";
+  elements.expenseDialog.hidden = false;
+  elements.expenseDialog.classList.add("is-open");
+  document.getElementById("expense-amount").focus();
+}
+
+function closeExpenseDialog() {
+  elements.expenseDialog.classList.remove("is-open");
+  elements.expenseDialog.hidden = true;
+}
+
+function normalizeMapValue(value, fallbackTitle) {
+  const trimmed = (value || "").trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const query = trimmed || fallbackTitle || "Okinawa";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function getRouteQueryValue(item) {
+  const mapValue = item.map || "";
+  try {
+    const url = new URL(mapValue);
+    const query = url.searchParams.get("query");
+    if (query) {
+      return query;
+    }
+  } catch (error) {
+    return item.title;
+  }
+
+  return item.title;
+}
+
+function buildDayRouteUrl(day) {
+  const routeStops = day.items
+    .map(getRouteQueryValue)
+    .map((stop) => stop?.trim())
+    .filter(Boolean);
+
+  if (routeStops.length < 2) {
+    const query = routeStops[0] || `${day.title} Okinawa`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  }
+
+  const [origin, ...restStops] = routeStops;
+  const destination = restStops.pop();
+  const url = new URL("https://www.google.com/maps/dir/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("origin", origin);
+  url.searchParams.set("destination", destination);
+  if (restStops.length) {
+    url.searchParams.set("waypoints", restStops.join("|"));
+  }
+  url.searchParams.set("travelmode", "driving");
+  return url.toString();
 }
 
 function renderChecklist() {
@@ -727,7 +1032,7 @@ function renderSync() {
     elements.syncSetupNote.innerHTML = `
       <div>
         <p class="sync-intro-card__title">建立你們的旅伴房間</p>
-        <p class="sync-intro-card__text">輸入同一組房間代碼，例如 <code>okinawa-family-2026</code>，你和旅伴就能共用記帳與清單。</p>
+        <p class="sync-intro-card__text">輸入同一組房間代碼，例如 <code>okinawa-family-2026</code>，你和旅伴就能共用行程、記帳與清單。</p>
       </div>
       <div class="pill pill--accent">1 個代碼就能共用</div>
     `;
@@ -739,7 +1044,7 @@ function renderSync() {
     elements.syncSetupNote.innerHTML = `
       <div>
         <p class="sync-intro-card__title">已連到房間 <code>${state.sync.roomId}</code></p>
-        <p class="sync-intro-card__text">把同一個 room code 或分享連結給旅伴，雙方會看到同一份記帳與清單。</p>
+        <p class="sync-intro-card__text">把同一個 room code 或分享連結給旅伴，雙方會看到同一份行程、記帳與清單。</p>
       </div>
       <div class="pill pill--accent">${state.sync.lastSyncedAt ? `最近同步 ${formatTimestamp(state.sync.lastSyncedAt)}` : "即時同步啟用"}</div>
     `;
@@ -918,9 +1223,11 @@ async function startSharedSync() {
 
       isApplyingRemoteSync = true;
       lastPushedSyncRevision = revision;
+      state.itinerary = Array.isArray(sharedState.itinerary) ? normalizeItinerary(sharedState.itinerary) : state.itinerary;
       state.checklist = mergeChecklistWithDefaults(Array.isArray(sharedState.checklist) ? sharedState.checklist : state.checklist);
       state.expenses = Array.isArray(sharedState.expenses) ? sharedState.expenses : state.expenses;
       saveStateWithoutSync();
+      renderItinerary();
       renderChecklist();
       renderExpenses();
       renderSync();
@@ -985,6 +1292,7 @@ async function pushSharedState(force) {
     revision,
     updatedAt: Date.now(),
     sharedState: {
+      itinerary: state.itinerary,
       checklist: state.checklist,
       expenses: state.expenses
     }

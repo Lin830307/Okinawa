@@ -2,6 +2,7 @@
 
 這個專案已經支援：
 
+- `每日行程` 共用同步
 - `行前清單` 共用同步
 - `旅遊記帳` 共用同步
 - 透過 `room code` 或 `?room=...` 連結加入同一個房間
@@ -105,6 +106,7 @@ sharedTrips/{roomId}
   revision: "1716800000000-ab12cd",
   updatedAt: 1716800000000,
   sharedState: {
+    itinerary: [...],
     checklist: [...],
     expenses: [...]
   }

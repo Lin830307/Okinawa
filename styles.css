@@ -248,6 +248,18 @@ button {
   font-size: 1.6rem;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+
+.section-title-row h2 {
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
 .section-kicker {
   margin: 0;
   color: var(--accent);
@@ -268,6 +280,85 @@ button {
   margin-top: 20px;
 }
 
+.itinerary-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.itinerary-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.itinerary-form span {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.itinerary-form__wide {
+  grid-column: 1 / -1;
+}
+
+.itinerary-form__actions {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.itinerary-dialog,
+.modal-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(8, 31, 48, 0.38);
+  backdrop-filter: blur(8px);
+}
+
+.itinerary-dialog[hidden],
+.modal-dialog[hidden] {
+  display: none;
+}
+
+.itinerary-dialog .itinerary-form,
+.modal-dialog .expense-form,
+.modal-dialog .checklist-form {
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 28px));
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid rgba(0, 119, 182, 0.16);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(72, 202, 228, 0.16), transparent 24%),
+    linear-gradient(180deg, rgba(249, 253, 255, 0.98), rgba(241, 250, 255, 0.96));
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(10, 63, 96, 0.28);
+}
+
+.itinerary-dialog__header,
+.modal-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.itinerary-dialog__header h3,
+.modal-dialog__header h3 {
+  margin: 6px 0 0;
+  font-size: 1.35rem;
+}
+
+.modal-dialog__actions {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 .itinerary-timeline {
   display: grid;
   gap: 14px;
@@ -282,6 +373,11 @@ button {
   border-radius: 22px;
   background: linear-gradient(135deg, rgba(214, 242, 255, 0.92), rgba(255, 255, 255, 0.97));
   border: 1px solid var(--line);
+}
+
+.route-link {
+  flex: 0 0 auto;
+  text-decoration: none;
 }
 
 .day-header h3,
@@ -366,11 +462,40 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 18px 72px 8px 24px;
+  padding: 18px 18px 8px 24px;
 }
 
 .itinerary-card__heading {
   min-width: 0;
+}
+
+.itinerary-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 208px;
+}
+
+.itinerary-card__actions .icon-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+}
+
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  transform: none;
+}
+
+.icon-button:disabled:hover {
+  background:
+    linear-gradient(180deg, rgba(248, 253, 255, 0.98), rgba(224, 241, 252, 0.95));
+  color: var(--accent-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 8px 20px rgba(0, 119, 182, 0.08);
 }
 
 .itinerary-card__body {
@@ -446,6 +571,20 @@ button {
   font-weight: 700;
 }
 
+.button--compact {
+  margin-top: 6px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  white-space: nowrap;
+}
+
+.title-add-button {
+  width: 40px;
+  height: 40px;
+  margin-top: 6px;
+  border-radius: 14px;
+}
+
 .button {
   background: linear-gradient(135deg, #0077b6 0%, #00a6d6 56%, #48cae4 100%);
   color: #fff;
@@ -493,19 +632,24 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.checklist-form {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.checklist-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.checklist-form span {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .expense-form__wide {
   grid-column: 1 / -1;
-}
-
-.expense-note-row {
-  position: relative;
-}
-
-.expense-note-action {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
 }
 
 .expense-form label,
@@ -606,15 +750,6 @@ select {
 
 .icon-button--add:hover {
   transform: scale(1.03);
-}
-
-.expense-add-button {
-  justify-self: end;
-  margin-top: 0;
-}
-
-.expense-note-row input {
-  max-width: 620px;
 }
 
 .expense-section-header {
@@ -976,8 +1111,47 @@ select {
   }
 
   .inline-form,
-  .expense-form {
+  .expense-form,
+  .itinerary-form {
     grid-template-columns: 1fr;
+  }
+
+  .day-header,
+  .itinerary-card__summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .route-link {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .itinerary-dialog,
+  .modal-dialog {
+    padding: 18px;
+  }
+
+  .itinerary-dialog .itinerary-form,
+  .modal-dialog .expense-form,
+  .modal-dialog .checklist-form {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .itinerary-form__actions,
+  .modal-dialog__actions {
+    justify-content: stretch;
+  }
+
+  .itinerary-form__actions .button,
+  .modal-dialog__actions .button {
+    flex: 1 1 140px;
+  }
+
+  .itinerary-card__actions {
+    justify-content: flex-start;
+    max-width: 100%;
   }
 
   .stack-item {

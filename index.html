@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon.svg">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=5">
   <title>沖繩行程 PWA</title>
 </head>
 <body>
@@ -46,7 +46,15 @@
           <div class="panel__header">
             <div>
               <p class="section-kicker">Daily Plan</p>
-              <h2>每日行程</h2>
+              <div class="section-title-row">
+                <h2>每日行程</h2>
+                <button id="open-itinerary-dialog-button" class="icon-button title-add-button" type="button" aria-label="新增景點" title="新增景點">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
           <div id="day-tabs" class="day-tabs" aria-label="每日行程切換"></div>
@@ -59,13 +67,17 @@
           <div class="panel__header">
             <div>
               <p class="section-kicker">Before You Go</p>
-              <h2>行前清單</h2>
+              <div class="section-title-row">
+                <h2>行前清單</h2>
+                <button id="open-checklist-dialog-button" class="icon-button title-add-button" type="button" aria-label="新增行前項目" title="新增行前項目">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-          <form id="checklist-form" class="inline-form">
-            <input id="checklist-input" type="text" maxlength="80" placeholder="加入要準備的項目，例如：防水手機袋">
-            <button class="button" type="submit">新增項目</button>
-          </form>
           <p class="helper-text">每個項目都可以重新命名或刪除；若啟用同步，也會和旅伴共用同一份清單。</p>
           <div id="checklist-items" class="stack-list"></div>
         </section>
@@ -76,7 +88,15 @@
           <div class="panel__header">
             <div>
               <p class="section-kicker">Budget Log</p>
-              <h2>旅遊記帳</h2>
+              <div class="section-title-row">
+                <h2>旅遊記帳</h2>
+                <button id="open-expense-dialog-button" class="icon-button title-add-button" type="button" aria-label="新增支出" title="新增支出">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
             <p id="expense-count" class="pill">0 筆支出</p>
           </div>
@@ -94,54 +114,6 @@
               <strong id="expense-average">¥0</strong>
             </article>
           </div>
-
-          <form id="expense-form" class="expense-form">
-            <label>
-              <span>日期</span>
-              <input id="expense-date" type="date" required>
-            </label>
-            <label>
-              <span>分類</span>
-              <select id="expense-category">
-                <option>交通</option>
-                <option>餐飲</option>
-                <option>住宿</option>
-                <option>購物</option>
-                <option>門票</option>
-                <option>其他</option>
-              </select>
-            </label>
-            <label>
-              <span>金額</span>
-              <input id="expense-amount" type="number" min="0" step="1" required placeholder="例如 2500">
-            </label>
-            <label>
-              <span>幣別</span>
-              <select id="expense-currency">
-                <option value="JPY">JPY</option>
-                <option value="TWD">TWD</option>
-              </select>
-            </label>
-            <label>
-              <span>付款人</span>
-              <select id="expense-payer">
-                <option>YY</option>
-                <option>Henry</option>
-              </select>
-            </label>
-            <label class="expense-form__wide expense-note-row">
-              <span>備註</span>
-              <div class="expense-note-action">
-                <input id="expense-note" type="text" maxlength="80" placeholder="例如：A&W 午餐、停車費、藥妝">
-                <button class="icon-button icon-button--add expense-add-button" type="submit" aria-label="新增支出" title="新增支出">
-                  <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
-                    <path d="M12 5v14"></path>
-                    <path d="M5 12h14"></path>
-                  </svg>
-                </button>
-              </div>
-            </label>
-          </form>
 
           <section class="expense-records-panel">
           <div class="expense-section-header">
@@ -292,8 +264,8 @@
             <article class="sync-info-card sync-info-card--active">
               <div class="sync-info-card__badge">會同步</div>
               <div>
-                <p class="sync-info-card__title">記帳、行前清單</p>
-                <p class="sync-info-card__text">旅伴使用同一組 room code，就會看到同一份資料。</p>
+                <p class="sync-info-card__title">行程、記帳、行前清單</p>
+                <p class="sync-info-card__text">旅伴使用同一組 room code，就會看到同一份可調整的旅行資料。</p>
               </div>
             </article>
             <article class="sync-info-card">
@@ -309,12 +281,161 @@
     </main>
   </div>
 
+  <div id="itinerary-dialog" class="itinerary-dialog" role="dialog" aria-modal="true" aria-labelledby="itinerary-dialog-title" hidden>
+    <form id="itinerary-form" class="itinerary-form" method="dialog">
+      <div class="itinerary-dialog__header">
+        <div>
+          <p class="section-kicker">Spot Editor</p>
+          <h3 id="itinerary-dialog-title">新增景點</h3>
+        </div>
+        <button id="itinerary-dialog-close-button" class="icon-button" type="button" aria-label="關閉" title="關閉">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <label>
+        <span>建議時段</span>
+        <input id="itinerary-time" type="text" maxlength="40" placeholder="例如 14:00 - 15:30">
+      </label>
+      <label>
+        <span>景點名稱</span>
+        <input id="itinerary-title" type="text" maxlength="80" placeholder="例如 瀨長島 Umikaji Terrace" required>
+      </label>
+      <label class="itinerary-form__wide">
+        <span>小提醒</span>
+        <input id="itinerary-note" type="text" maxlength="160" placeholder="例如 適合看夕陽，也可以順路買咖啡">
+      </label>
+      <label class="itinerary-form__wide">
+        <span>地圖連結或地址</span>
+        <input id="itinerary-map" type="text" maxlength="240" placeholder="可貼 Google Maps 連結，或輸入地址 / 景點名稱">
+      </label>
+      <div class="form-row itinerary-form__wide itinerary-form__actions">
+        <button id="itinerary-submit-button" class="button" type="submit">新增景點</button>
+        <button id="itinerary-cancel-edit-button" class="button button--ghost" type="button">取消</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="expense-dialog" class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-dialog-title" hidden>
+    <form id="expense-form" class="expense-form" method="dialog">
+      <div class="modal-dialog__header">
+        <div>
+          <p class="section-kicker">Budget Entry</p>
+          <h3 id="expense-dialog-title">新增支出</h3>
+        </div>
+        <button id="expense-dialog-close-button" class="icon-button" type="button" aria-label="關閉" title="關閉">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <label>
+        <span>日期</span>
+        <input id="expense-date" type="date" required>
+      </label>
+      <label>
+        <span>分類</span>
+        <select id="expense-category">
+          <option>交通</option>
+          <option>餐飲</option>
+          <option>住宿</option>
+          <option>購物</option>
+          <option>門票</option>
+          <option>其他</option>
+        </select>
+      </label>
+      <label>
+        <span>金額</span>
+        <input id="expense-amount" type="number" min="0" step="1" required placeholder="例如 2500">
+      </label>
+      <label>
+        <span>幣別</span>
+        <select id="expense-currency">
+          <option value="JPY">JPY</option>
+          <option value="TWD">TWD</option>
+        </select>
+      </label>
+      <label>
+        <span>付款人</span>
+        <select id="expense-payer">
+          <option>YY</option>
+          <option>Henry</option>
+        </select>
+      </label>
+      <label class="expense-form__wide">
+        <span>備註</span>
+        <input id="expense-note" type="text" maxlength="80" placeholder="例如：A&W 午餐、停車費、藥妝">
+      </label>
+      <div class="form-row expense-form__wide modal-dialog__actions">
+        <button class="button" type="submit">新增支出</button>
+        <button id="expense-cancel-button" class="button button--ghost" type="button">取消</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="checklist-dialog" class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="checklist-dialog-title" hidden>
+    <form id="checklist-form" class="checklist-form" method="dialog">
+      <div class="modal-dialog__header">
+        <div>
+          <p class="section-kicker">Packing Item</p>
+          <h3 id="checklist-dialog-title">新增行前項目</h3>
+        </div>
+        <button id="checklist-dialog-close-button" class="icon-button" type="button" aria-label="關閉" title="關閉">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <label>
+        <span>項目內容</span>
+        <input id="checklist-input" type="text" maxlength="80" placeholder="例如：防水手機袋" required>
+      </label>
+      <div class="form-row modal-dialog__actions">
+        <button class="button" type="submit">新增項目</button>
+        <button id="checklist-cancel-button" class="button button--ghost" type="button">取消</button>
+      </div>
+    </form>
+  </div>
+
   <template id="itinerary-card-template">
     <article class="itinerary-card">
       <div class="itinerary-card__rail"></div>
       <div class="itinerary-card__summary">
         <div class="itinerary-card__heading">
           <h3></h3>
+        </div>
+        <div class="itinerary-card__actions">
+          <button class="icon-button itinerary-move-up" type="button" aria-label="往上移動" title="往上移動">
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+              <path d="M12 19V5"></path>
+              <path d="M5 12l7-7 7 7"></path>
+            </svg>
+          </button>
+          <button class="icon-button itinerary-move-down" type="button" aria-label="往下移動" title="往下移動">
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+              <path d="M12 5v14"></path>
+              <path d="M19 12l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <button class="icon-button itinerary-edit" type="button" aria-label="編輯景點" title="編輯景點">
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+              <path d="M4 20l4.2-1 9.4-9.4-3.2-3.2L5 15.8 4 20z"></path>
+              <path d="M13.8 5.6l3.2 3.2"></path>
+            </svg>
+          </button>
+          <button class="icon-button icon-button--danger itinerary-delete" type="button" aria-label="刪除景點" title="刪除景點">
+            <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+              <path d="M6 7h12"></path>
+              <path d="M9 7V5h6v2"></path>
+              <path d="M8 7l.8 11h6.4L16 7"></path>
+              <path d="M10 11v4"></path>
+              <path d="M14 11v4"></path>
+            </svg>
+          </button>
         </div>
       </div>
       <div class="itinerary-card__body">
@@ -339,7 +460,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="app.js"></script>
+  <script src="firebase-config.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
