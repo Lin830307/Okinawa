@@ -241,7 +241,6 @@ const elements = {
   weatherForm: document.getElementById("weather-form"),
   weatherLocation: document.getElementById("weather-location"),
   weatherUpdatedAt: document.getElementById("weather-updated-at"),
-  heroWeatherTemp: document.getElementById("hero-weather-temp"),
   weatherRangeNote: document.getElementById("weather-range-note"),
   weatherCurrentTemp: document.getElementById("weather-current-temp"),
   weatherCurrentText: document.getElementById("weather-current-text"),
@@ -1151,9 +1150,6 @@ function renderWeather() {
   elements.weatherLocation.value = state.weather.location;
   if (!state.weather.forecast) {
     elements.weatherUpdatedAt.textContent = "尚未更新";
-    if (elements.heroWeatherTemp) {
-      elements.heroWeatherTemp.textContent = "--°C";
-    }
     elements.weatherRangeNote.textContent = "目前還沒有抓到天氣資料。等更新完成後，我會告訴你現在顯示的是近期預報，還是已經對到 2026/6/13 到 2026/6/17 的行程日期。";
     elements.weatherForecast.innerHTML = `<div class="empty-state">按一下更新天氣，就會帶入那霸近幾天的預報。</div>`;
     return;
@@ -1161,9 +1157,6 @@ function renderWeather() {
 
   const { current, daily } = state.weather.forecast;
   elements.weatherUpdatedAt.textContent = formatTimestamp(state.weather.updatedAt);
-  if (elements.heroWeatherTemp) {
-    elements.heroWeatherTemp.textContent = `${Math.round(current.temperature_2m)}°C`;
-  }
   elements.weatherCurrentTemp.textContent = `${Math.round(current.temperature_2m)}°C`;
   elements.weatherCurrentText.textContent = weatherCodeToText(current.weather_code);
   elements.weatherCurrentRain.textContent = `${Math.max(...daily.precipitation_probability_max)}%`;
