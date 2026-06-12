@@ -56,9 +56,9 @@ button {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 20% 18%, rgba(125, 222, 255, 0.22), transparent 18%),
-    radial-gradient(circle at 86% 14%, rgba(255, 255, 255, 0.18), transparent 16%),
-    linear-gradient(145deg, #023e8a 0%, #0077b6 42%, #00b4d8 74%, #90e0ef 100%);
+    radial-gradient(circle at 84% 16%, rgba(121, 232, 255, 0.28), transparent 18%),
+    radial-gradient(circle at 18% 82%, rgba(255, 255, 255, 0.08), transparent 22%),
+    linear-gradient(135deg, #0c4d99 0%, #0a75bb 38%, #10a3d6 72%, #44c6e4 100%);
   color: #fff;
   border-radius: 32px;
   box-shadow: var(--shadow);
@@ -67,23 +67,19 @@ button {
 .hero::after {
   content: "";
   position: absolute;
-  inset: auto -8% -60px;
-  height: 160px;
+  inset: auto 0 0;
+  height: 84px;
   background:
-    radial-gradient(circle at 8% 40%, rgba(255, 255, 255, 0.95) 0 14%, transparent 15%),
-    radial-gradient(circle at 22% 50%, rgba(255, 255, 255, 0.78) 0 12%, transparent 13%),
-    radial-gradient(circle at 38% 48%, rgba(255, 255, 255, 0.92) 0 13%, transparent 14%),
-    radial-gradient(circle at 54% 42%, rgba(255, 255, 255, 0.75) 0 12%, transparent 13%),
-    radial-gradient(circle at 72% 52%, rgba(255, 255, 255, 0.88) 0 13%, transparent 14%),
-    radial-gradient(circle at 90% 46%, rgba(255, 255, 255, 0.82) 0 12%, transparent 13%);
-  opacity: 0.3;
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(192, 238, 248, 0.12) 28%, rgba(150, 220, 242, 0.24) 100%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 24%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.03) 72%, rgba(255, 255, 255, 0.08) 100%);
+  opacity: 0.8;
   pointer-events: none;
 }
 
 .hero__content {
   position: relative;
   z-index: 1;
-  padding: 32px 24px;
+  padding: 28px 24px 24px;
 }
 
 .hero h1 {
@@ -153,24 +149,24 @@ button {
 .hero__glow {
   position: absolute;
   border-radius: 999px;
-  filter: blur(18px);
-  opacity: 0.4;
+  filter: blur(26px);
+  opacity: 0.22;
 }
 
 .hero__glow--one {
-  top: -20px;
-  right: -30px;
-  width: 180px;
-  height: 180px;
-  background: rgba(255, 255, 255, 0.24);
+  top: -24px;
+  right: -18px;
+  width: 150px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .hero__glow--two {
-  left: 10%;
-  bottom: -72px;
-  width: 220px;
-  height: 220px;
-  background: rgba(144, 224, 239, 0.34);
+  left: 12%;
+  bottom: -92px;
+  width: 180px;
+  height: 180px;
+  background: rgba(144, 224, 239, 0.2);
 }
 
 .main-layout {
@@ -1199,6 +1195,11 @@ select {
 @media (max-width: 720px) {
   .app-shell {
     padding: 14px 12px 32px;
+  }
+
+  .hero::after {
+    height: 70px;
+    opacity: 0.72;
   }
 
   .hero__content,
