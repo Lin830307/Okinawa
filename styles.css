@@ -375,6 +375,16 @@ button {
   border: 1px solid var(--line);
 }
 
+.day-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.day-title-edit {
+  flex: 0 0 auto;
+}
+
 .route-link {
   flex: 0 0 auto;
   text-decoration: none;
@@ -1120,6 +1130,10 @@ select {
   .itinerary-card__summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .day-header__title-row {
+    align-items: flex-start;
   }
 
   .route-link {

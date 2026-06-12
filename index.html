@@ -318,6 +318,31 @@
     </form>
   </div>
 
+  <div id="day-title-dialog" class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="day-title-dialog-title" hidden>
+    <form id="day-title-form" class="checklist-form" method="dialog">
+      <div class="modal-dialog__header">
+        <div>
+          <p class="section-kicker">Day Title</p>
+          <h3 id="day-title-dialog-title">編輯當天標題</h3>
+        </div>
+        <button id="day-title-dialog-close-button" class="icon-button" type="button" aria-label="關閉" title="關閉">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M18 6L6 18"></path>
+            <path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <label>
+        <span>標題名稱</span>
+        <input id="day-title-input" type="text" maxlength="60" placeholder="例如 海底奇境" required>
+      </label>
+      <div class="form-row modal-dialog__actions">
+        <button id="day-title-submit-button" class="button" type="submit">儲存標題</button>
+        <button id="day-title-cancel-button" class="button button--ghost" type="button">取消</button>
+      </div>
+    </form>
+  </div>
+
   <div id="expense-dialog" class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="expense-dialog-title" hidden>
     <form id="expense-form" class="expense-form" method="dialog">
       <div class="modal-dialog__header">

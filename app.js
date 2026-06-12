@@ -192,6 +192,7 @@ let isApplyingRemoteSync = false;
 let lastPushedSyncRevision = null;
 let syncPushTimer = null;
 let editingItineraryItem = null;
+let editingDayTitleId = null;
 
 const elements = {
   topTabs: [...document.querySelectorAll(".top-tab")],
@@ -207,6 +208,13 @@ const elements = {
   itineraryMap: document.getElementById("itinerary-map"),
   itinerarySubmitButton: document.getElementById("itinerary-submit-button"),
   itineraryCancelEditButton: document.getElementById("itinerary-cancel-edit-button"),
+  dayTitleDialog: document.getElementById("day-title-dialog"),
+  dayTitleDialogTitle: document.getElementById("day-title-dialog-title"),
+  dayTitleDialogCloseButton: document.getElementById("day-title-dialog-close-button"),
+  dayTitleForm: document.getElementById("day-title-form"),
+  dayTitleInput: document.getElementById("day-title-input"),
+  dayTitleSubmitButton: document.getElementById("day-title-submit-button"),
+  dayTitleCancelButton: document.getElementById("day-title-cancel-button"),
   dayTabs: document.getElementById("day-tabs"),
   dayView: document.getElementById("day-view"),
   openChecklistDialogButton: document.getElementById("open-checklist-dialog-button"),
@@ -444,6 +452,39 @@ function bindEvents() {
     closeItineraryDialog();
   });
 
+  elements.dayTitleDialogCloseButton.addEventListener("click", () => {
+    closeDayTitleDialog();
+  });
+
+  elements.dayTitleCancelButton.addEventListener("click", () => {
+    closeDayTitleDialog();
+  });
+
+  elements.dayTitleDialog.addEventListener("click", (event) => {
+    if (event.target === elements.dayTitleDialog) {
+      closeDayTitleDialog();
+    }
+  });
+
+  elements.dayTitleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const nextTitle = elements.dayTitleInput.value.trim();
+    if (!editingDayTitleId || !nextTitle) {
+      return;
+    }
+
+    const day = state.itinerary.find((entry) => entry.id === editingDayTitleId);
+    if (!day) {
+      closeDayTitleDialog();
+      return;
+    }
+
+    day.title = nextTitle;
+    saveState();
+    renderItinerary();
+    closeDayTitleDialog();
+  });
+
   elements.openChecklistDialogButton.addEventListener("click", () => {
     openChecklistDialog();
   });
@@ -652,11 +693,23 @@ function renderItinerary() {
   dayHeader.innerHTML = `
     <div>
       <p class="section-kicker">${activeDay.label} · ${activeDay.date}</p>
-      <h3>${activeDay.title}</h3>
+      <div class="day-header__title-row">
+        <h3>${activeDay.title}</h3>
+        <button class="icon-button day-title-edit" type="button" aria-label="編輯當天標題" title="編輯當天標題">
+          <svg aria-hidden="true" viewBox="0 0 24 24" class="icon-button__svg">
+            <path d="M4 20l4.2-1 9.4-9.4-3.2-3.2L5 15.8 4 20z"></path>
+            <path d="M13.8 5.6l3.2 3.2"></path>
+          </svg>
+        </button>
+      </div>
     </div>
     <a class="button button--ghost route-link" href="${buildDayRouteUrl(activeDay)}" target="_blank" rel="noreferrer noopener">查看今日路線</a>
   `;
   elements.dayView.appendChild(dayHeader);
+
+  dayHeader.querySelector(".day-title-edit").addEventListener("click", () => {
+    editDayTitle(activeDay.id);
+  });
 
   const timeline = document.createElement("div");
   timeline.className = "itinerary-timeline";
@@ -752,10 +805,29 @@ function editItineraryItem(dayId, itemId) {
   openItineraryDialog("編輯景點");
 }
 
+function editDayTitle(dayId) {
+  const day = state.itinerary.find((entry) => entry.id === dayId);
+  if (!day) {
+    return;
+  }
+
+  editingDayTitleId = dayId;
+  elements.dayTitleInput.value = day.title;
+  elements.dayTitleDialogTitle.textContent = `${day.label} 標題`;
+  elements.dayTitleSubmitButton.textContent = "儲存標題";
+  openDayTitleDialog();
+}
+
 function clearItineraryEditState() {
   editingItineraryItem = null;
   elements.itineraryDialogTitle.textContent = "新增景點";
   elements.itinerarySubmitButton.textContent = "新增景點";
+}
+
+function clearDayTitleEditState() {
+  editingDayTitleId = null;
+  elements.dayTitleDialogTitle.textContent = "編輯當天標題";
+  elements.dayTitleSubmitButton.textContent = "儲存標題";
 }
 
 function openItineraryDialog(title) {
@@ -769,6 +841,19 @@ function closeItineraryDialog() {
   clearItineraryEditState();
   elements.itineraryDialog.classList.remove("is-open");
   elements.itineraryDialog.hidden = true;
+}
+
+function openDayTitleDialog() {
+  elements.dayTitleDialog.hidden = false;
+  elements.dayTitleDialog.classList.add("is-open");
+  elements.dayTitleInput.focus();
+  elements.dayTitleInput.select();
+}
+
+function closeDayTitleDialog() {
+  clearDayTitleEditState();
+  elements.dayTitleDialog.classList.remove("is-open");
+  elements.dayTitleDialog.hidden = true;
 }
 
 function openChecklistDialog() {
